@@ -1,0 +1,97 @@
+touch parent_sort.c #first file
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+// Bubble sort function
+void bubbleSort(int arr[], int n) {
+    for (int i = 0; i < n - 1; i++) {
+        for (int j = 0; j < n - i - 1; j++) {
+            if (arr[j] > arr[j + 1]) {
+                int temp = arr[j];
+                arr[j] = arr[j + 1];
+                arr[j + 1] = temp;
+            }
+        }
+    }
+}
+
+int main() {
+    int n;
+    printf("Enter number of elements: ");
+    scanf("%d", &n);
+
+    int arr[n];
+    printf("Enter %d elements:\n", n);
+    for (int i = 0; i < n; i++) {
+        scanf("%d", &arr[i]);
+    }
+
+    bubbleSort(arr, n);
+
+    printf("\n[Parent] Sorted Array: ");
+    for (int i = 0; i < n; i++) {
+        printf("%d ", arr[i]);
+    }
+    printf("\n");
+
+    pid_t pid = fork();
+
+    if (pid < 0) {
+        perror("Fork failed");
+        exit(1);
+    }
+
+    if (pid == 0) {
+        // CHILD PROCESS
+        printf("\n[Child] Executing new program using execve()...\n");
+
+        char *args[n + 2];
+        args[0] = "./reverse_display";  // Program to execute
+        for (int i = 0; i < n; i++) {
+            char *num = malloc(10);
+            sprintf(num, "%d", arr[i]);  // Convert int → string
+            args[i + 1] = num;
+        }
+        args[n + 1] = NULL;  // Null-terminate argument list
+
+        execve(args[0], args, NULL);
+
+        perror("execve failed");
+        exit(1);
+    } else {
+        // PARENT PROCESS
+        wait(NULL);
+        printf("\n[Parent] Child process completed successfully.\n");
+    }
+
+    return 0;
+}
+
+touch reverse_display.c #second file
+
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        printf("No numbers received!\n");
+        return 1;
+    }
+
+    printf("\n[Child Program] Displaying array in reverse order:\n");
+    for (int i = argc - 1; i > 0; i--) {
+        printf("%s ", argv[i]);
+    }
+    printf("\n\n");
+
+    return 0;
+}
+
+
+gcc parent_sort.c -o parent_sort
+gcc reverse_display.c -o reverse_display
+./parent_sort
