@@ -1,0 +1,171 @@
+#include <stdio.h>     // Standard I/O functions
+#include <stdlib.h>    // exit(), memory allocation
+#include <unistd.h>    // pipe(), fork(), read(), write(), close()
+#include <string.h>    // string utilities
+#include <fcntl.h>     // control options for low-level I/O
+
+#define MAX 1024   // buffer size
+
+// Function to analyze text: counts chars, words, lines
+void analyze_text(char *text, int *chars, int *words, int *lines) {
+    int i = 0;
+    *chars = *words = *lines = 0; // initialize counters#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <unistd.h>
+
+#define BUFFER_SIZE 5
+
+int buffer[BUFFER_SIZE];
+int in = 0, out = 0;
+
+// Semaphores and Mutex
+sem_t empty;
+sem_t full;
+pthread_mutex_t mutex;
+
+// Producer function
+void* producer(void* arg) {
+    int item;
+    for (int i = 1; i <= 10; i++) {
+        item = rand() % 100;  // produce item
+        sem_wait(&empty);     // decrease empty count
+        pthread_mutex_lock(&mutex); // lock critical section
+
+        buffer[in] = item;
+        printf("Producer produced: %d\n", item);
+        in = (in + 1) % BUFFER_SIZE;
+
+        pthread_mutex_unlock(&mutex); // unlock critical section
+        sem_post(&full);              // increase full count
+        sleep(1);
+    }
+    return NULL;
+}
+
+// Consumer function
+void* consumer(void* arg) {
+    int item;
+    for (int i = 1; i <= 10; i++) {
+        sem_wait(&full);              // wait if buffer empty
+        pthread_mutex_lock(&mutex);   // lock critical section
+
+        item = buffer[out];
+        printf("Consumer consumed: %d\n", item);
+        out = (out + 1) % BUFFER_SIZE;
+
+        pthread_mutex_unlock(&mutex); // unlock
+        sem_post(&empty);             // increase empty slots
+        sleep(2);
+    }
+    return NULL;
+}
+
+int main() {
+    pthread_t prodThread, consThread;
+
+    // Initialize semaphores and mutex
+    sem_init(&empty, 0, BUFFER_SIZE);
+    sem_init(&full, 0, 0);
+    pthread_mutex_init(&mutex, NULL);
+
+    // Create threads
+    pthread_create(&prodThread, NULL, producer, NULL);
+    pthread_create(&consThread, NULL, consumer, NULL);
+
+    // Wait for threads to finish
+    pthread_join(prodThread, NULL);
+    pthread_join(consThread, NULL);
+
+    // Destroy semaphores and mutex
+    sem_destroy(&empty);
+    sem_destroy(&full);
+    pthread_mutex_destroy(&mutex);
+
+    printf("\nExecution completed successfully.\n");
+    return 0;
+}
+
+    while (text[i] != '\0') {   // loop till null terminator
+        (*chars)++;             // count character
+
+        // check word delimiters (space, newline, tab)
+        if (text[i] == ' ' || text[i] == '\n' || text[i] == '\t') {
+            (*words)++;
+            if (text[i] == '\n') {
+                (*lines)++;
+            }
+        }
+        i++;
+    }
+
+    // If text has content, increment word count (last word)
+    if (i > 0 && text[i-1] != ' ' && text[i-1] != '\n' && text[i-1] != '\t') {
+        (*words)++;
+    }
+    if (i > 0) {
+        (*lines)++;
+    }
+}
+
+int main() {
+    int pipe1[2], pipe2[2];   // two pipes: parent→child and child→parent
+    pid_t pid;
+    char buffer[MAX];
+
+    // create both pipes
+    if (pipe(pipe1) == -1 || pipe(pipe2) == -1) {
+        perror("Pipe failed");
+        exit(1);
+    }
+
+    pid = fork();   // create child process
+    if (pid < 0) {
+        perror("Fork failed");
+        exit(1);
+    }
+
+    if (pid > 0) {
+        // ----- Parent Process -----
+        close(pipe1[0]); // close read end of pipe1
+        close(pipe2[1]); // close write end of pipe2
+
+        // take input from user
+        printf("Enter text (end with Ctrl+D):\n");
+        char input[MAX];
+        int n = read(STDIN_FILENO, input, sizeof(input));
+        input[n] = '\0';  // null terminate
+
+        // write input to child
+        write(pipe1[1], input, strlen(input) + 1);
+        close(pipe1[1]);
+
+        // read analyzed result from child
+        read(pipe2[0], buffer, sizeof(buffer));
+        printf("\nResult from child process:\n%s\n", buffer);
+
+        close(pipe2[0]);
+    }
+    else {
+        // ----- Child Process -----
+        close(pipe1[1]); // close write end of pipe1
+        close(pipe2[0]); // close read end of pipe2
+
+        // read input from parent
+        read(pipe1[0], buffer, sizeof(buffer));
+        close(pipe1[0]);
+
+        // analyze text
+        int chars, words, lines;
+        analyze_text(buffer, &chars, &words, &lines);
+
+        // prepare result string
+        char result[MAX];
+        sprintf(result, "Characters: %d\nWords: %d\nLines: %d\n", chars, words, lines);
+
+        // send result back to parent
+        write(pipe2[1], result, strlen(result) + 1);
+        close(pipe2[1]);
+    }
+}
